@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Version Check Log Viewer (Pivot)</title>
+    <link rel="stylesheet" href="assets/styles.css">
+    <meta http-equiv="expires" content="0" />
+</head>
+<body>
+    <header>
+        <h1>VERSION MATRIX</h1>
+    </header>
+    <main>
+        <section class="panel">
+            <div class="controls">
+                <button id="reloadBtn" title="ログを再読込">RELOAD</button>
+                <a id="openRaw" href="version_data.js" target="_blank" rel="noopener" class="btn-alt" title="version_data.js を開く">OPEN RAW</a>
+                <input id="hostFilter" type="text" class="host-filter" placeholder="Host filter (regex可)" title="ホスト名フィルタ。空で全件 / 正規表現可" />
+                <button id="clearFilterBtn" class="btn-alt" title="フィルタ解除">CLEAR</button>
+                <span class="page-load-indicator">Loaded: <span id="pageLoadTime">-</span></span>
+            </div>
+            <div id="tableContainer" class="table-container">
+                <table id="logTable" class="matrix">
+                    <thead>
+                        <tr>
+                            <th>Host</th>
+                            <th>Checked (Age)</th>
+                            <th>Git</th>
+                            <th>Matlab</th>
+                            <th>Prometheus</th>
+                            <th>gitlab-runner</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+            <details class="help">
+                <summary>説明 / ヘルプ</summary>
+                <ul>
+                    <li>データソース: <code>version_data.js</code></li>
+                    <li>PowerShell 実行でJSへ追記 → RELOAD で反映</li>
+                    <li>Age は現在時刻との差（日数, 小数1桁）。</li>
+                </ul>
+            </details>
+            <!-- alt-open removed -->
+        </section>
+    </main>
+    <footer></footer>
+    <!-- version_data.js を先に読み込む -->
+    <script src="version_data.js"></script>
+    <script src="assets/app.js"></script>
+</body>
+</html>
