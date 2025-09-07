@@ -1,0 +1,166 @@
+﻿    <!DOCTYPE html>
+    <html lang=\"ja\">
+    <head>
+        <meta charset=\"UTF-8\" />
+        <meta name=\"viewport\" content=\"width=device-width,initial-scale=1.0\" />
+        <title>Version Matrix</title>
+    <style>
+:root {
+  --bg-root: #0f1115;
+  --bg-panel: #181b22;
+  --bg-panel-alt: #1f242c;
+  --bg-accent: #24303a;
+  --border-color: #2e3a46;
+  --border-color-soft: #3a4652;
+  --text-primary: #d4d9e1;
+  --text-secondary: #9aa4af;
+  --accent: #3d82f6;
+  --accent-glow: #60a5fa;
+  --danger: #d1606d;
+  --warn: #d1a450;
+  --ok: #4fa37f;
+  --font-stack: 'Segoe UI','Inter','Roboto','Helvetica Neue',Arial,sans-serif;
+}
+body { font-family: var(--font-stack); background: var(--bg-root); color: var(--text-primary); }
+header { background: linear-gradient(90deg,#1d2530,#283344); box-shadow: 0 2px 6px rgba(0,0,0,0.6); padding:10px 16px 8px; }
+header h1 { font-weight:500; letter-spacing:.5px; font-size:1.05rem; margin:0; }
+.fx-glitch { color: var(--accent); text-shadow:none; font-weight:400; }
+main { padding: 14px clamp(8px,2vw,22px) 34px; }
+
+.panel { max-width: 980px; margin:0 auto; background:var(--bg-panel); border:1px solid var(--border-color); border-radius:10px; padding:14px 16px 22px; box-shadow:0 4px 12px -4px rgba(0,0,0,.6); }
+
+.controls { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-bottom:10px; }
+
+.controls button, .btn-alt { background: var(--bg-panel-alt); border:1px solid var(--border-color-soft); color: var(--text-primary); border-radius:6px; padding:6px 14px; cursor:pointer; font-family:inherit; letter-spacing:1px; font-size:0.8rem; transition:.25s; text-decoration:none; }
+
+.controls button:hover, .btn-alt:hover { background: var(--bg-accent); border-color: var(--accent); color:#fff; box-shadow:0 0 0 1px var(--accent),0 0 0 4px rgba(96,165,250,0.15); }
+
+.controls input[type=checkbox] { display:none; }
+
+.status { display:none; }
+.last-inline, .update-time, .elapsed { display:none; }
+
+.log-wrapper { position:relative; }
+
+iframe { width:100%; height:420px; border:1px solid #00f6d2; border-radius:6px; background:#050b0b; box-shadow:0 0 14px rgba(0,255,200,0.25) inset; }
+
+.help { margin-top:16px; font-size:0.7rem; }
+
+.help summary { cursor:pointer; color:#9ff; }
+
+.alt-open { margin-top:12px; }
+
+.btn-alt { display:inline-block; }
+
+.host-filter { background:var(--bg-panel-alt); border:1px solid var(--border-color-soft); color:var(--text-primary); padding:5px 8px; border-radius:6px; font-size:0.7rem; min-width:160px; }
+.host-filter:focus { outline:none; border-color:var(--accent); box-shadow:0 0 0 2px rgba(61,130,246,0.35); }
+
+.page-load-indicator { font-size:0.6rem; color:var(--text-secondary); margin-left:4px; }
+#pageLoadTime { color:var(--accent-glow); }
+
+/* Scrollbar styling (webkit) */
+iframe::-webkit-scrollbar, pre::-webkit-scrollbar { width:10px; }
+iframe::-webkit-scrollbar-track, pre::-webkit-scrollbar-track { background:#021a17; }
+iframe::-webkit-scrollbar-thumb, pre::-webkit-scrollbar-thumb { background:#00f6d2; box-shadow:0 0 6px #00f6d2; }
+
+.table-container { margin-top:10px; overflow-x:auto; }
+#logTable { width:100%; border-collapse: collapse; font-size:0.8rem; background: var(--bg-panel-alt); }
+#logTable thead { background: #20262f; }
+#logTable th, #logTable td { border:1px solid var(--border-color); padding:5px 7px; text-align:left; }
+#logTable tbody tr:nth-child(odd){ background:#181d24; }
+#logTable tbody tr:nth-child(even){ background:#1b2027; }
+#logTable tbody tr:hover { background:#222a34; }
+.status-pill { padding:2px 8px; border-radius:12px; font-size:0.55rem; letter-spacing:0.5px; display:inline-block; }
+.status-ok { background:#022; border:1px solid #00cfae; color:#00f6d2; }
+.status-fail { background:#220010; border:1px solid #ff2f7d; color:#ff5fa2; }
+.status-warn { background:#221700; border:1px solid #ffb347; color:#ffc978; }
+.fallback-note { font-size:0.55rem; opacity:0.65; margin:4px 0 6px; }
+
+.matrix th, .matrix td { text-align:center; }
+.matrix td { font-size:0.65rem; position:relative; }
+.matrix td.ok    { background:#1e2a24; color:#8fd8b9; }
+.matrix td.fail  { background:#2c1e24; color:#d89099; }
+.matrix td.warn  { background:#2c261a; color:#d8c090; }
+.matrix td.blank { background:#1a1f25; color:#4a5866; }
+.matrix td.ver-cell {
+  position: relative;
+  background: #1d2329;
+  color: #b8c2cc;
+  border: 1px solid #26313c;
+  transition: background .25s, color .25s, box-shadow .25s;
+}
+.matrix td.ver-cell:hover { box-shadow: 0 0 0 1px #2f3c47 inset; }
+.matrix td.ver-cell small { opacity:.6; }
+.matrix td.small { display:block; font-size:0.5rem; opacity:0.85; margin-top:2px; }
+.matrix tbody tr:hover td { filter:brightness(1.25); }
+
+footer { margin:28px auto 8px; max-width:980px; font-size:0.6rem; color:var(--text-secondary); text-align:right; }
+
+@media (max-width:600px){ header h1 { font-size:0.9rem; } .controls { gap:5px; } .controls button { padding:5px 10px; } }
+
+    </style>
+</head>
+<body>
+        <header><h1>VERSION MATRIX</h1></header>
+    <main>
+        <section class="panel">
+            <div class="controls">
+                <button id="reloadBtn" title="リロード">RELOAD</button>
+                <input id="hostFilter" type="text" class="host-filter" placeholder="Host filter (regex可)" />
+                <button id="clearFilterBtn" class="btn-alt">CLEAR</button>
+                <span class="page-load-indicator">Loaded: <span id="pageLoadTime">-</span></span>
+            </div>
+            <div class="table-container">
+                <table id="logTable" class="matrix">
+                    <thead><tr><th>Host</th><th>Checked (Age)</th><th>Git</th><th>Matlab</th><th>Prometheus</th><th>gitlab-runner</th></tr></thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+                <details class="help"><summary>説明 / ヘルプ</summary>
+                    <ul><li>データソース: <code>assets/version_data.js</code>（最新1件のみ上書き保存）</li><li>PowerShell 実行毎に最新版を書き出し → RELOAD ボタンで再読込</li><li>Age: 取得時刻との差（日数, 小数1桁）</li></ul>
+            </details>
+        </section>
+    </main>
+    <script>
+/** Generated version data (latest only). */
+window.versionMatrix = [];
+window.versionMatrix.push({"timestamp":"2025-09-07 17:56:53","host":"FMVPC","Git":"git version 2.40.0.windows.1","Matlab":"25.1.0.2973910","Prometheus":"Not installed or failed to get version","gitlab-runner":"Not installed or failed to get version"});
+
+    </script>
+    <script>
+// version_data.js (window.versionMatrix) を使用して Host 行 / ソフト列マトリクス表示 (F5相当のページリロード対応)
+(function(){
+  const TARGET_SOFTWARE = ['Git','Matlab','Prometheus','gitlab-runner'];
+  const btn = document.getElementById('reloadBtn');
+  const tbody = document.querySelector('#logTable tbody');
+  const hostFilterInput = document.getElementById('hostFilter');
+  const clearBtn = document.getElementById('clearFilterBtn');
+  const pageLoadEl = document.getElementById('pageLoadTime');
+
+  const COLOR_POOL = ['#2d3f50','#374754','#3d4e59','#42545f','#485c66','#4e636d', '#566d77','#5d7580','#647d89','#6a8591','#728d9a','#7995a2'];
+  const versionColorMap = new Map();
+  let colorIndex = 0;
+
+  function pad(n){ return n.toString().padStart(2,'0'); }
+  function fmt(d){ return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`; }
+  function classify(result){ if(!result) return 'blank'; if(/Not installed|failed/i.test(result)) return 'fail'; if(/Update|warning/i.test(result)) return 'warn'; return 'ok'; }
+  function dedupeLatest(records){ const map = new Map(); records.forEach(r => map.set(r.host, r)); return Array.from(map.values()); }
+  function shortText(val){ return !val ? '' : val.split(/\s+/).slice(0,6).join(' '); }
+  function getVersionColor(raw){ if(!raw) return null; const norm = raw.trim(); if(!versionColorMap.has(norm)){ const c = COLOR_POOL[colorIndex % COLOR_POOL.length]; versionColorMap.set(norm,c); colorIndex++; } return versionColorMap.get(norm); }
+  function parseTimestamp(ts){ if(!ts) return null; const m = ts.match(/^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})$/); if(!m) return null; return new Date(+m[1], +m[2]-1, +m[3], +m[4], +m[5], +m[6]); }
+  function diffDays(fromDate, toDate){ if(!fromDate||!toDate) return ''; return ((toDate - fromDate)/86400000).toFixed(1); }
+  function matchHost(host, filter){ if(!filter) return true; try { if(filter.startsWith('/') && filter.endsWith('/') && filter.length>2){ const pattern = filter.slice(1,-1); return new RegExp(pattern,'i').test(host);} if(/[.*+?^${}()|\\[\\]\\]/.test(filter)){ return new RegExp(filter,'i').test(host);} return host.toLowerCase().includes(filter.toLowerCase()); } catch(e){ return host.toLowerCase().includes(filter.toLowerCase()); } }
+  function getFilteredRows(){ const vm = (window.versionMatrix || []); const rows = dedupeLatest(vm); const filter = hostFilterInput.value.trim(); return rows.filter(r=>matchHost(r.host, filter)); }
+  function render(){ const vm = (window.versionMatrix||[]); if(vm.length===0){ tbody.innerHTML='<tr><td colspan="6" class="blank" style="text-align:left">データがありません。PowerShellを実行してください。</td></tr>'; return; } const rows = getFilteredRows(); rows.sort((a,b)=>a.host.localeCompare(b.host,'en',{numeric:true})); tbody.innerHTML=''; TARGET_SOFTWARE.forEach(sw=>{ const versions=[]; rows.forEach(r=>{ const v=r[sw]; if(v && !/Not installed|failed/i.test(v) && !versions.includes(v)) versions.push(v); }); versions.sort(); versions.forEach(v=>getVersionColor(v)); }); const now = new Date(); if(rows.length===0){ tbody.innerHTML='<tr><td colspan="6" class="blank" style="text-align:left">フィルタに一致するホストはありません。</td></tr>'; return; } rows.forEach(rec=>{ const tr=document.createElement('tr'); const hostTd=document.createElement('th'); hostTd.textContent=rec.host; hostTd.style.textAlign='left'; tr.appendChild(hostTd); const tsTd=document.createElement('td'); if(rec.timestamp){ const age=diffDays(parseTimestamp(rec.timestamp), now); tsTd.textContent=`${rec.timestamp}  (${age}d)`; } else { tsTd.textContent=''; } tr.appendChild(tsTd); TARGET_SOFTWARE.forEach(sw=>{ const td=document.createElement('td'); const val=rec[sw]; const statusClass=classify(val); td.className=statusClass+' ver-cell'; if(val){ const c=getVersionColor(val); if(c && statusClass==='ok'){ td.style.background=c; td.style.color='#d4d9e1'; td.style.borderColor='#2e3a46'; } td.textContent=shortText(val); if(val.length>60){ const sm=document.createElement('small'); sm.textContent=val.slice(0,60)+'…'; td.appendChild(sm);} } tr.appendChild(td); }); tbody.appendChild(tr); }); }
+  function init(){ pageLoadEl.textContent = fmt(new Date()); render(); }
+  // F5 相当: location.reload(true) は非推奨なので cache-busting を付与して再遷移
+  function fullPageReload(){ try { const url = new URL(window.location.href); url.searchParams.set('_', Date.now()); window.location.replace(url.toString()); } catch(e){ window.location.reload(); } }
+  btn.addEventListener('click', fullPageReload);
+  hostFilterInput.addEventListener('input', render);
+  clearBtn.addEventListener('click', ()=>{ hostFilterInput.value=''; render(); });
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', init); else init();
+})();
+
+    </script>
+</body>
+</html>

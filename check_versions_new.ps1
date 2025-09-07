@@ -2,12 +2,33 @@
 
 # Path settings (テキストログは出力しない方針だが既存残骸削除用にパス保持)
 $logPath    = "C:\Users\bridg\Documents\github\softwareVersionCheck\version_check.log"
-$jsDataPath = "C:\Users\bridg\Documents\github\softwareVersionCheck\version_data.js"  # JS履歴
+# 出力先を assets/version_data.js に変更 (スクリプト位置基準)
+$jsDataPath = Join-Path $PSScriptRoot 'assets' | Join-Path -ChildPath 'version_data.js'
+
+# 毎回最新のみ保持するため既存version_data.jsを削除
+if (Test-Path $jsDataPath) { Remove-Item $jsDataPath -ErrorAction SilentlyContinue }
 
 # Integrated software list
 $softwareList = @(
     @{ name = "Git"; command = "git --version" },
-    @{ name = "Matlab"; command = "powershell -File c:\\Users\\bridg\\Documents\\github\\softwareVersionCheck\\getMatlabVersion.ps1 -ExecutionPolicy Bypass" },
+    # Matlab: inline parser using 'matlab -help' output (here-string for readability)
+    @{ name = "Matlab"; command = @'
+& {
+        try {
+            $raw = & matlab -help 2>&1
+            if(-not $raw){ 'Not installed or failed to get version'; return }
+            $joined = $raw -join "`n"
+            $m = [regex]::Match($joined,'MATLAB\s+Version:\s*([0-9]+\.[0-9]+(?:\.[0-9]+)*)\s*\((R20[0-9]{2}[ab])\)\s*(?:Update\s*(\d+))?',[System.Text.RegularExpressions.RegexOptions]::IgnoreCase)
+            if($m.Success){
+                $core=$m.Groups[1].Value; $rel=$m.Groups[2].Value; $upd=$m.Groups[3].Value
+                if($upd){ "$core ($rel) Update $upd" } else { "$core ($rel)" }
+            } else {
+                $plain = $raw | Where-Object { $_ -match '^\s*Version:\s*([0-9]+(\.[0-9]+){1,3})' } | Select-Object -First 1
+                if($plain){ $null = $plain -match '^\s*Version:\s*([0-9]+(\.[0-9]+){1,3})'; $matches[1] } else { 'Not installed or failed to get version' }
+            }
+        } catch { 'Not installed or failed to get version' }
+}
+'@ },
     @{ name = "Prometheus"; command = "prometheus --version" },
     @{ name = "gitlab-runner"; command = "gitlab-runner --version" }
 )
@@ -53,17 +74,7 @@ $results = $jobs | ForEach-Object {
     $output = Receive-Job -Job $job -Wait
     Remove-Job -Job $job
 
-    # MATLAB 特殊処理（テンポラリログ名固定）
-    if ($output -like "*matlab_version.log*") {
-        $matlabTmp = "matlab_version.log"
-        if (Test-Path $matlabTmp) {
-            $matlabVersion = Get-Content $matlabTmp | Select-String -Pattern "MATLAB" | ForEach-Object { $_.ToString().Trim() }
-            Remove-Item $matlabTmp -ErrorAction SilentlyContinue
-            return "[Matlab] $matlabVersion"
-        } else {
-            return "[Matlab] Version log not found"
-        }
-    }
+    # （Matlab は inline parser へ移行済み）
 
     $output
 }
@@ -88,13 +99,72 @@ foreach ($line in $results) {
 }
 
 $json = ($record | ConvertTo-Json -Depth 3 -Compress)
-$jsLine = "window.versionMatrix = window.versionMatrix || []; window.versionMatrix.push($json);"
+# 最新のみ出力: 毎回ファイルを上書きして単一レコードだけ保持
+$header = @('/** Generated version data (latest only). */', 'window.versionMatrix = [];') -join "`n"
+$body   = "window.versionMatrix.push($json);"
+Set-Content -Path $jsDataPath -Value ($header + "`n" + $body) -Encoding UTF8
+Write-Host ("JS data overwritten with latest record: {0}" -f $jsDataPath)
 
-if (-not (Test-Path $jsDataPath)) {
-    Set-Content -Path $jsDataPath -Value "/** Generated version data history. */" -Encoding UTF8
+# ===== Standalone HTML Bundle 生成 =====
+try {
+        $cssPath   = Join-Path $PSScriptRoot 'assets' | Join-Path -ChildPath 'styles.css'
+        $appJsPath = Join-Path $PSScriptRoot 'assets' | Join-Path -ChildPath 'app.js'
+        $bundlePath = Join-Path $PSScriptRoot 'version_matrix_standalone.html'
+
+        $styles = ''
+        if (Test-Path $cssPath) { $styles = Get-Content $cssPath -Raw -Encoding UTF8 }
+        $appJs = ''
+        if (Test-Path $appJsPath) { $appJs = Get-Content $appJsPath -Raw -Encoding UTF8 }
+        $dataJs = ''
+        if (Test-Path $jsDataPath) { $dataJs = Get-Content $jsDataPath -Raw -Encoding UTF8 }
+
+            $bundle = @"
+    <!DOCTYPE html>
+    <html lang=\"ja\">
+    <head>
+        <meta charset=\"UTF-8\" />
+        <meta name=\"viewport\" content=\"width=device-width,initial-scale=1.0\" />
+        <title>Version Matrix</title>
+    <style>
+$styles
+    </style>
+</head>
+<body>
+        <header><h1>VERSION MATRIX</h1></header>
+    <main>
+        <section class="panel">
+            <div class="controls">
+                <button id="reloadBtn" title="リロード">RELOAD</button>
+                <input id="hostFilter" type="text" class="host-filter" placeholder="Host filter (regex可)" />
+                <button id="clearFilterBtn" class="btn-alt">CLEAR</button>
+                <span class="page-load-indicator">Loaded: <span id="pageLoadTime">-</span></span>
+            </div>
+            <div class="table-container">
+                <table id="logTable" class="matrix">
+                    <thead><tr><th>Host</th><th>Checked (Age)</th><th>Git</th><th>Matlab</th><th>Prometheus</th><th>gitlab-runner</th></tr></thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+                <details class="help"><summary>説明 / ヘルプ</summary>
+                    <ul><li>データソース: <code>assets/version_data.js</code>（最新1件のみ上書き保存）</li><li>PowerShell 実行毎に最新版を書き出し → RELOAD ボタンで再読込</li><li>Age: 取得時刻との差（日数, 小数1桁）</li></ul>
+            </details>
+        </section>
+    </main>
+    <script>
+$dataJs
+    </script>
+    <script>
+$appJs
+    </script>
+</body>
+</html>
+"@
+
+        Set-Content -Path $bundlePath -Value $bundle -Encoding UTF8
+        Write-Host ("Standalone bundle generated: {0}" -f $bundlePath)
+} catch {
+        Write-Warning "Standalone bundle generation failed: $($_.Exception.Message)"
 }
-Add-Content -Path $jsDataPath -Value $jsLine -Encoding UTF8
-Write-Host ("JS data appended: {0}" -f $jsDataPath)
 
 # 後片付け: 既存の旧ログがあれば削除
 if (Test-Path $logPath) { Remove-Item $logPath -ErrorAction SilentlyContinue }
